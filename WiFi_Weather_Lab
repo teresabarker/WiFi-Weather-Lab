@@ -1,0 +1,156 @@
+// Alex Hirsh & Teresa Barker
+// WiFi Weather Lab
+// IST 402-001
+
+#include <ArduinoJson.h>
+#include <SPI.h>
+#include <WiFiNINA.h>
+#include "arduino_secrets.h"
+ 
+char ssid[] = SECRET_SSID; //  your network SSID (name)
+char pass[] = SECRET_PSW;//  your network PASSWORD ()
+ 
+//open weather map api key
+String apiKey = SECRET_APIKEY;
+ 
+//the city you want the weather for
+String location = "Honolulu";
+ 
+int status = WL_IDLE_STATUS;
+char server_name[] = "api.openweathermap.org";
+ 
+WiFiClient client;
+ 
+ 
+void setup() {
+  //Initialize serial and wait for port to open:
+  Serial.begin(9600);
+ 
+  // attempt to connect to Wifi network:
+  while (status != WL_CONNECTED) {
+    Serial.print("Attempting to connect to SSID: ");
+    Serial.println(ssid);
+ 
+    //use the line below if your network is protected by wpa password
+    status = WiFi.begin(ssid, pass);
+ 
+    // wait 10 seconds for connection:
+    delay(10000);
+    Serial.println(status);
+  }
+  Serial.println("Connected to wifi");
+}
+ 
+void loop() {
+  getWeather();
+  delay(10000);
+}
+ 
+ 
+void getWeather() {
+ 
+  Serial.println("\nStarting connection to server...");
+  // if you get a connection, report back via serial:
+  if (client.connect(server_name, 80)) {
+    Serial.println("connected to server");
+    // Make a HTTP request:
+    client.print("GET /data/2.5/forecast?");
+    client.print("q=" + location);
+    client.print("&appid=" + apiKey);
+    client.print("&cnt=3");
+    client.println("&units=imperial");
+    client.println("Host: api.openweathermap.org");
+    client.println("Connection: close");
+    client.println();
+  } else {
+    Serial.println("unable to connect");
+  }
+ 
+  delay(1000);
+  String line = "";
+ 
+  while (client.connected()) {
+    line = client.readStringUntil('\n');
+ 
+    //Serial.println(line);
+    Serial.print("parsingValues: ");
+    Serial.println(line);
+ 
+    //create a json buffer where to store the json data
+    DynamicJsonDocument doc(5000);
+    DeserializationError error = deserializeJson(doc, line);
+    if (error){
+      return;
+    }
+
+    // Get the population & "feels like" data from the json tree
+    String population = doc["city"]["population"];
+    
+    String feels_like0 = doc["list"][0]["main"]["feels_like"];
+    String dt_txt0 = doc["list"][0]["dt_txt"];
+
+    String feels_like1 = doc["list"][1]["main"]["feels_like"];
+    String dt_txt1 = doc["list"][1]["dt_txt"];
+
+    String feels_like2 = doc["list"][2]["main"]["feels_like"];
+    String dt_txt2 = doc["list"][2]["dt_txt"];
+
+    String feels_like3 = doc["list"][3]["main"]["feels_like"];
+    String dt_txt3 = doc["list"][3]["dt_txt"];
+
+    String feels_like4 = doc["list"][4]["main"]["feels_like"];
+    String dt_txt4 = doc["list"][4]["dt_txt"];
+
+    // Print city & population
+    Serial.print("city: ");
+    Serial.println(location);
+    Serial.print("population: ");
+    Serial.println(population); // get population
+
+    // Print "feels like"
+    Serial.print("it will be ");
+    Serial.print(feels_like0);
+    Serial.print(" degrees on ");
+    Serial.println(dt_txt0);
+
+    Serial.print("it will be ");
+    Serial.print(feels_like1);
+    Serial.print(" degrees on ");
+    Serial.println(dt_txt1);
+
+    Serial.print("it will be ");
+    Serial.print(feels_like2);
+    Serial.print(" degrees on ");
+    Serial.println(dt_txt2);
+
+    Serial.print("it will be ");
+    Serial.print(feels_like3);
+    Serial.print(" degrees on ");
+    Serial.println(dt_txt3);
+
+    Serial.print("it will be ");
+    Serial.print(feels_like4);
+    Serial.print(" degrees on ");
+    Serial.println(dt_txt4);
+
+    // Get average of "feels like" days
+    int feels_like0Int = feels_like0.toInt();
+    int feels_like1Int = feels_like1.toInt();
+    int feels_like2Int = feels_like2.toInt();
+    // int feels_like3Int = feels_like3.toInt();
+    // int feels_like4Int = feels_like4.toInt();
+
+    int feels_like_avg = (feels_like0Int + feels_like1Int + feels_like2Int) / 3;
+    Serial.print("The average feels-like temp is: ");
+    Serial.println(feels_like_avg);
+    
+    // Print "Wear a coat" or "Let's go to the beach"
+    if (feels_like_avg >= 45) {
+      Serial.println("Let's go to the beach!");
+    } else if (feels_like_avg < 45) {
+      Serial.println("Wear a coat.");
+    } else {
+      Serial.println("Couldn't compare average");
+    }
+  }
+}
